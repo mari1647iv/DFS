@@ -206,15 +206,13 @@ def send_file(path, fs_path, addr):
     sock = sockets[addr]
     sock.send(bytes("write {}".format(storage + fs_path), "utf-8"))
     time.sleep(2)
-    file1 = open(path, 'rb')
-    content = file1.read(1024)
-    while (content):
+    content = client_conn.recv(BUFFER_SIZE)
+    while (content != b'0'):
         print(content)
         sock.send(content)
-        content = file1.read(1024)
+        content = client_conn.recv(BUFFER_SIZE)
     time.sleep(2)
     sock.send(b'0')
-    file1.close()
 
 
 def delete_dir(dirname):
