@@ -31,7 +31,7 @@ class Client:
         self.__send_msg__(f'mkdir {path}')
 
     def ls(self, path):
-        self.__send_msg__(f'lsdir {path}')
+        self.__send_msg__(f'ls {path}')
 
     def cd(self, path):
         self.__send_msg__(f'cd {path}')
@@ -40,7 +40,7 @@ class Client:
         self.__send_msg__(f'rmdir {path}')
 
     def create_file(self, filepath):
-        self.__send_msg__(f'create {filepath}')
+        self.__send_msg__(f'create_file {filepath}')
 
     def upload(self, local_path, remote_path):
         data = self.__send_msg__(f"write {local_path} {remote_path}")
