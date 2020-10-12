@@ -5,6 +5,9 @@ import os
 from time import sleep
 import sys
 import psycopg2
+import pathlib
+import subprocess
+import time
 
 HOST = "localhost"
 PORT = 8080
@@ -14,37 +17,59 @@ sockets = {}
 conn = {}
 datanodes = []
 current_dir = "/"
+storage = "/var/storage"
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((HOST, PORT))
 sock.listen(5)
 print('Listening..')
-while True:
-        connection, addr = sock.accept()
-        dn_port = connection.recvfrom(1024)
-        print("Node {}: connected". format(addr))
-        key = addr[0] + ":" + dn_port[0].decode()
-        sockets[key] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sockets[key].connect((addr[0], int(dn_port[0].decode())))
-        conn[key] = connection
-        datanodes.append(key)
 
+def handle_conn():
+    while True:
+            node_conn, addr = sock.accept()
+            node_port =  node_conn.recvfrom(1024)
+            print("Node at {}: connected". format(addr))
+            index = addr[0] + ":" + node_port[0].decode()
+            datanodes.append(index)
+            sockets[index] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sockets[index].connect((addr[0], int(node_port[0].decode())))
+            conn[index] =  node_conn
 
-def initialize():
+def check_nodes_activity():
+    while True:
+        for datanode in datanodes:
+            node_addr = datanode.split(":")
+            response = subprocess.getstatusoutput("ping -c 1 " + node_addr[0])
+            if response[0] == 1:
+                print("Node at {} stopped working, starting backup process". format(node_addr))
+                backup(datanode)
+        time.sleep(5)
+
+def initialize_storage():
     for i in sockets.values():
         i.send(bytes("Initialization..", "utf-8"))
     make_query("DROP TABLE IF EXISTS filesdb;", is_return=False)
     make_query("CREATE TABLE filesdb (filename Text, path TEXT, datanode1 TEXT, datanode2 TEXT, is_dir BOOLEAN, size TEXT);", False)
-
-def check_nodes():
-    pass
-
 
 def is_exists(filename):
     pass
 
 def get_file_path(filename):
     pass
+
+def send_file(path, fs_path, addr):
+    sock = sockets[addr]
+    sock.send(bytes("write {}". format(storage + fs_path), "utf-8"))
+    time.sleep(2)
+    file1 = open(path, 'rb')
+    content = file1.read(1024)
+    while (content):
+        print(content)
+        sock.send(content)
+        content = file1.read(1024)
+    time.sleep(2)
+    sock.send(b'0')
+    file1.close()
 
 def mkdir(path, dirname):
     pass
@@ -90,7 +115,49 @@ def make_query(query, is_return):
 
 
 def backup(addr):
-    pass
+    backup_files = make_query("SELECT * FROM filesdb Where (datanode1='{}' OR datanode2='{}') AND is_dir=FALSE;". format(addr, addr), True)
+    backup_dir = '/backup_{}'. format(addr)
+    for backup_file in backup_files:
+        if backup_file[1] != addr:
+            backup_read(backup_file[0], backup_file[1], backup_dir)  # TODO
+        else:
+            backup_read(backup_file[0], backup_file[2], backup_dir)
+        backup_write(backup_file, backup_file[0], addr, backup_dir)
+    print("Finished backup of node at {}". format(addr))
+    datanodes.remove(addr)
+
+def backup_read(filename, addr, backup_dir):
+    sock = sockets[addr]
+    node_conn = conn[addr]
+    sock.send(bytes("read " + storage + filename, "utf-8"))
+    pathlib.Path(backup_dir+filename[:filename.rfind("/")+1]).mkdir(parents=True, exist_ok=True)
+    with open(backup_dir + filename, 'wb') as handle:
+        s = node_conn.recv(1024)
+        if s == b'1':
+            s = node_conn.recv(1024)
+            handle.write(s)
+            print("Ok")
+            while (len(s) > 1024):
+                print("Receiving...")
+                s = node_conn.recv(1024)
+                handle.write(s)
+                print(s)
+            handle.close()
+        else:
+            handle.close()
+
+def backup_write(fileinf, filename, addr, backup_dir):
+    if len(datanodes) <= datanodes_number:
+        print("Cannot create replica. Could not find some datanodes")
+    else:
+        for datanode in datanodes:
+            if datanode != fileinf[1] and datanode != fileinf[2]:
+                send_file(backup_dir + filename, filename, datanode)
+                if addr == fileinf[1]:
+                    make_query("UPDATE filesdb set datanode1='{}'". format(datanode), False)
+                else:
+                    make_query("UPDATE filesdb set datanode='{}'". format(datanode), False)
+    
 
 def close():
     for i in datanodes:
@@ -102,14 +169,29 @@ def close():
 
 
 if __name__ == "__main__":
-    initialize()
+    initialize_storage()
+
+    thread1 = Thread(target=handle_conn)
+    thread2 = Thread(target=check_nodes_activity)
+    thread1.daemon = True
+    thread2.daemon = True
+    thread1.start()
+    thread2.start()
+
+    interval = 0
+    while len(datanodes) < datanodes_number:
+        print("Waiting for data servers to connect..")
+        interval += 5
+        interval = min(15, interval)
+        time.sleep(interval)
+
     while True:
         try:
             print(current_dir + ">", end=" ")
             inpt = input()
             commands = inpt.split(" ")
             if commands[0] == "init":
-                initialize()
+                initialize_storage()
             elif commands[0] == "cd":
                 cd(commands[1])
             elif commands[0] == "ls":
