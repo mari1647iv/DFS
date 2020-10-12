@@ -4,7 +4,7 @@
 
 ## System Setup
   + Install docker
-  + Install postgres or run `docker run --name postgresDFS -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres` on namenode machine
+  + Install postgres or run ```docker run --name postgresDFS -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres``` on namenode machine
   + Run next commands:
       + Namenode:
         + ```docker run --network="host" urbeingwatched8/namenode <ip address> <port>``
