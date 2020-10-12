@@ -48,20 +48,23 @@ def check_nodes_activity():
 
 def initialize_storage():
     for i in sockets.values():
-        i.send(bytes("Initialization..", "utf-8"))
+        i.send(bytes("init", "utf-8"))
     make_query("DROP TABLE IF EXISTS filesdb;", is_return=False)
-    make_query("CREATE TABLE filesdb (filename Text, path TEXT, datanode1 TEXT, datanode2 TEXT, is_dir BOOLEAN, size TEXT);", False)
+    make_query("CREATE TABLE filesdb (filename Text, datanode1 TEXT, datanode2 TEXT, dir TEXT, is_dir BOOLEAN, size TEXT);", False)
 
 def is_exists(filename):
     if current_dir != '/':
         path = current_dir + "/" + filename
     else:
         path = current_dir + filename
-    length = len(make_query("SELECT * From filesdb where filename='{}'". format(path), True))
+    is_exist_path(path)
+
+def is_exist_path(filepath):
+    length = len(make_query("SELECT * From filesdb where filename='{}'". format(filepath), True))
     if length == 0:
-        print("Not found:'{}'". format(path))
+        print("Not found:'{}'". format(filepath))
         return False
-    print("Already Exists:'{}'". format(path))
+    print("Already Exists:'{}'". format(filepath))
     return True
 
 def get_file_ips(filepath):
@@ -86,35 +89,181 @@ def send_file(path, fs_path, addr):
     sock.send(b'0')
     file1.close()
 
-def mkdir(path, dirname):
-    pass
+def mkdir(addr, path):
+    sockets[addr].send(bytes("makedir " + storage + path, "utf-8"))
+
+def mkdir_current(new_path):
+    if is_exists(new_path) != True:
+        if current_dir != "/":
+            path = current_dir + "/" + new_path
+        else:
+            path = current_dir + new_path
+        make_query("Insert into filesdb(filename, datanode1, datanode2, dir, is_dir, size) VALUES ('{0}','{1}','{2}','{3}', {4}, '-')".format(path, "_", "_", current_dir, True), False)
+        for i in sockets.values():
+            i.send(bytes("makedir " + storage + path, "utf-8"))
+    else:
+        print("Already Exists:'{}'". format(new_path))
 
 def create_file(filename):
-    pass
+    if is_exists(filename) != True:
+        ips = get_ips()
+        if current_dir != "/":
+            sockets[ips[0]].send(bytes("create " + storage+current_dir + "/" + filename, "utf-8"))
+            sockets[ips[1]].send(bytes("create " + storage+current_dir + "/" + filename, "utf-8"))
+            make_query(
+                "Insert into filesdb(filename, datanode1, datanode2, dir, is_dir, size) VALUES ('{0}','{1}','{2}','{3}', {4}, '0')"
+                    .format(current_dir + "/" + filename, ips[0], ips[1], current_dir, False), False)
+        else:
+            sockets[ips[0]].send(bytes("create " + storage+current_dir + filename, "utf-8"))
+            sockets[ips[1]].send(bytes("create " + storage+current_dir + filename, "utf-8"))
+            make_query(
+                "Insert into filesdb(filename, datanode1, datanode2, dir, is_dir, size) VALUES ('{0}','{1}','{2}','{3}', {4}, '0')"
+                    .format(current_dir + filename, ips[0], ips[1], current_dir, False), False)
+    else:
+        if current_dir != '/':
+            path = current_dir + "/" + filename
+        else:
+            path = current_dir + filename
+        print("Already exists:'{}'". format(path))
 
 def read(filename):
-    pass
+    if is_exists(filename):
+        if current_dir == "/":
+            path = current_dir + filename
+            ips = get_file_ips(path)
+        else:
+            path = current_dir + "/" + filename
+            ips = get_file_ips(path)
+        sock = sockets[ips[0]]
+        node_conn = conn[ips[0]]
+        sock.send(bytes("read " + storage + path, "utf-8"))
+        pathlib.Path('/received_files'+path[:path.rfind("/")+1]).mkdir(parents=True, exist_ok=True)
+        with open('/received_files' + path, 'wb') as handle:
+            if node_conn.recv(1024) == b'1':
+                s = node_conn.recv(1024)
+                handle.write(s)
+                print("Ok")
+                while (len(s) > 1024):
+                    print("Receiving...")
+                    s = node_conn.recv(1024)
+                    handle.write(s)
+                    print(s)
+                handle.close()
+            else:
+                open('/received_files/' + filename, 'w+').close()
+    else:
+        if current_dir != '/':
+            path = current_dir + "/" + filename
+        else:
+            path = current_dir + filename
+        print("Not found:'{}'". format(path))
 
-def write(filename, str):
-    pass
+def write(path, fs_path):
+    ips = get_ips()
+    if len(fs_path[:fs_path.rfind('/')]) == 0:
+        make_query("INSERT INTO filesdb(filename, datanode1, datanode, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
+               format(fs_path, ips[0], ips[1], '/',False, os.path.getsize(path)), False)
+    else:
+        make_query("INSERT INTO filesdb(filename, datanode1, datanode, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
+               format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')],False, os.path.getsize(path)), False)
+    for i in ips:
+        send_file(path, fs_path, i)
 
 def delete_dir(dirname):
-    pass
+    if is_exists(dirname):
+        if current_dir != "/":
+            path1 = current_dir + "/" + dirname  # /abc => /abc/1488
+        else:
+            path1 = current_dir + dirname  # / => /abc
+        requested_dir = make_query("SELECT * FROM filesdb WHERE dir='{}'".format(path1), True)
+        path = storage + path1
+
+        if len(requested_dir) == 0:
+            for i in sockets.values():
+                i.send(bytes("deletedir " + path, "utf-8"))
+                make_query("DELETE FROM filesdb where filename='{}'".format(path1), False)
+
+        else:
+            print("The folder is not empty. Are you sure you want to delete it? [y/n]\n>")
+            answer = input()
+            if answer == 'y':
+                for i in sockets.values():
+                    i.send(bytes("deletedir " + path, "utf-8"))
+                make_query("DELETE FROM filesdb where dir='{}'".format(path1), False)
+                make_query("DELETE FROM filesdb where filename='{}'".format(path1), False)
+    else:
+        if current_dir != '/':
+            path = current_dir + "/" + dirname
+        else:
+            path = current_dir + dirname
+        print("Not found:'{}'". format(path))
 
 def delete_file(filename):
-    pass
+    if is_exists(filename):
+        if current_dir != "/":
+            path1 = current_dir + "/" + filename
+        else:
+            path1 = current_dir + filename
+        requested_file = make_query("SELECT * FROM filesdb WHERE filename='{}'". format(path1), True)
+        path = storage + path1
+        if len(requested_file) == 0:
+            print("File doesn't exist")
+            return
+        else:
+            make_query("DELETE FROM filesdb Where filename='{}'". format(path1), False)
+            sockets[requested_file[0][1]].send(bytes("delete {}".format(path), "utf-8"))
+            sockets[requested_file[0][2]].send(bytes("delete {}".format(path), "utf-8"))
+    else:
+        if current_dir != '/':
+            path = current_dir + "/" + filename
+        else:
+            path = current_dir + filename
+        print("Not found:'{}'". format(path))
 
 def ls():
-    pass
+    requested_files = make_query("SELECT * FROM filesdb WHERE dir = '{0}';".format(current_dir), True)
+    for requested_file in requested_files:
+        if requested_file[4]:
+            print("Directory {}".format(requested_file[0]))
+        else:
+            print("File {}".format(requested_file[0]))
 
 def cd(path):
-    pass
+    global current_dir
+    if path == "/" or is_exists(path):
+        print(path)
+        if path == "/":
+            current_dir = "/" 
+        else:
+            if current_dir == "/":
+                current_dir = current_dir + path  
+            else:
+                current_dir = current_dir + "/" + path  # /
 
 def cp(src, dest):
-    pass
+    if is_exist_path(src)==True and is_exist_path(dest)==False:
+        ips = get_file_ips(src)
+        make_query(
+            "Insert into filesdb(filename, datanode1, datanode2, dir, is_dir) VALUES ('{0}','{1}','{2}','{3}', {4})"
+                .format(dest, ips[0], ips[1], dest[:dest.rfind('/')], False), False)
+        sockets[ips[0]].send(bytes("copy {} {}".format(storage+src, storage+dest), "utf-8"))
+        sockets[ips[1]].send(bytes("copy {} {}".format(storage+src, storage+dest), "utf-8"))
+    elif is_exist_path(src)==False:
+        print("Not found:'{}'". format(src))
+    else:
+        print("Already Exists:'{}'". format(dest))
+
 
 def mv(src, dest):
-    pass
+    if is_exist_path(src):
+        ips = get_file_ips(src)
+        make_query(
+            "Insert into filesdb(filename, datanode1, datanode2, dir, is_dir) VALUES ('{0}','{1}','{2}','{3}', {4})"
+                .format(dest, ips[0], ips[1], dest[:dest.rfind('/')], False), False)
+        make_query("DELETE FROM filesdb Where filename='{}'".format(src), False)
+        print(ips)
+        sockets[ips[0]].send(bytes("move " + storage+src + " " + storage+dest, "utf-8"))
+        sockets[ips[1]].send(bytes("move " + storage+src + " " + storage+dest, "utf-8"))
 
 def make_query(query, is_return):
     conn = psycopg2.connect(dbname='postgres', user='postgres', password='postgres', host='localhost', port="5432")
@@ -212,7 +361,7 @@ if __name__ == "__main__":
             elif commands[0] == "ls":
                 ls()
             elif commands[0] == "mkdir":
-                mkdir(commands[1], commands[2])
+                mkdir_current(commands[1])
                 ls()
             elif commands[0] == 'read':
                 read(commands[1])
