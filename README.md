@@ -4,13 +4,12 @@
 
 ## System Setup
   + Install docker
-  + Install postgres 
-  + Run postgres container on namenode
+  + Install postgres or run `docker run --name postgresDFS -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres` on namenode machine
   + Run next commands:
       + Namenode:
-        + ```sudo docker run -i -t --network='host' deadman445/namenode:latest <your_namenode_ip> <your_namenode_host>```
+        + ```docker run --network="host" urbeingwatched8/namenode <ip address> <port>``
       + Datanode:
-        + ```sudo docker run --network='host' -t deadman445/datanode:latest 10.0.15.10 <your_datanode_host> <your_datanode_ip> <your_namenode_host>```
+        + ```docker run --network="host" urbeingwatched8/datanode <ip address> <port> <ip addr of namenode> <port>```
 ## Architectural diagram
 ![Chat](https://github.com/mari1647iv/DFS/blob/main/ArchitecturalDiagram.png)
 
