@@ -151,21 +151,17 @@ def read(filename):
         sock = sockets[ips[0]]
         node_conn = conn[ips[0]]
         sock.send(bytes("read " + storage + path, "utf-8"))
-        pathlib.Path('/received_files' + path[:path.rfind("/") + 1]).mkdir(parents=True, exist_ok=True)
-        with open('/received_files' + path, 'wb') as handle:
-            if node_conn.recv(1024) == b'1':
+        if node_conn.recv(1024) == b'1':
+            s = node_conn.recv(1024)
+            client_conn.send(s)
+            print("Ok")
+            while (len(s) >= 1024):
+                print("Receiving...")
                 s = node_conn.recv(1024)
-                handle.write(s)
-                print("Ok")
-                while (len(s) > 1024):
-                    print("Receiving...")
-                    s = node_conn.recv(1024)
-                    handle.write(s)
-                    print(s)
-                handle.close()
-            else:
-                open('/received_files/' + filename, 'w+').close()
-        client_conn.send("OK".encode())
+                client_conn.send(s)
+                print(s)
+            client_conn.send(s)
+            client_conn.send(b'0')
     else:
         if current_dir != '/':
             path = current_dir + "/" + filename
@@ -206,15 +202,13 @@ def send_file(path, fs_path, addr):
     sock = sockets[addr]
     sock.send(bytes("write {}".format(storage + fs_path), "utf-8"))
     time.sleep(2)
-    file1 = open(path, 'rb')
-    content = file1.read(1024)
-    while (content):
+    content = client_conn.recv(BUFFER_SIZE)
+    while (content != b'0'):
         print(content)
         sock.send(content)
-        content = file1.read(1024)
+        content = client_conn.recv(BUFFER_SIZE)
     time.sleep(2)
     sock.send(b'0')
-    file1.close()
 
 
 def delete_dir(dirname):
