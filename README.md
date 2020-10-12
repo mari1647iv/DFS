@@ -5,7 +5,7 @@
 ## System Setup
   To do
 ## Architectural diagram
-  To do
+![Chat](https://github.com/mari1647iv/DFS/blob/main/ArchitecturalDiagram.png)
 ## Communication protocols
   To do
 ## Team members contribution
