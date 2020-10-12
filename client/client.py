@@ -30,7 +30,7 @@ class Client:
     def mkdir(self, path):
         self.__send_msg__(f'mkdir {path}')
 
-    def lsdir(self, path):
+    def ls(self, path):
         self.__send_msg__(f'lsdir {path}')
 
     def cd(self, path):
@@ -39,7 +39,7 @@ class Client:
     def rmdir(self, path):
         self.__send_msg__(f'rmdir {path}')
 
-    def touch(self, filepath):
+    def create_file(self, filepath):
         self.__send_msg__(f'create {filepath}')
 
     def upload(self, local_path, remote_path):
@@ -125,13 +125,13 @@ if __name__ == '__main__':
         'rm': (c.rm, 'Usage: rm /DFS_path', 2),
         'info': (c.describe_file, 'Usage: info DFS_file', 2),
         'copy': (c.cp, 'Usage: copy /DFS_path /DFS_dest_path', 3),
-        'ls': (c.lsdir, 'Usage: ls /DFS_path', 2),
+        'ls': (c.ls, 'Usage: ls /DFS_path', 2),
         'mv': (c.mv, 'Usage: mv /DFS_path /DFS_dest_path', 3),
         'rmdir': (c.rmdir, 'Usage: rmdir /DFS_path', 2),
         'mkdir': (c.mkdir, 'Usage: mkdir /DFS_path', 2),
         'cd': (c.cd, 'Usage: cd DFS_folder', 2),
         'init': (c.init_cluster, 'Usage: init', 1),
-        'create': (c.touch, 'Usage: create DFS_filename', 2)
+        'create_file': (c.create_file, 'Usage: create_file DFS_filename', 2)
     }
     opt(options)
 
