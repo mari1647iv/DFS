@@ -9,9 +9,17 @@ import pathlib
 import subprocess
 import time
 import random
+import argparse
 
-HOST = "localhost"
-PORT = 8080
+parser = argparse.ArgumentParser()
+parser.add_argument("ip")
+parser.add_argument("port")
+args = parser.parse_args()
+
+IP = args.ip
+PORT = int(args.port)
+CLIENT_IP = '127.0.0.1'
+CLIENT_PORT = 8800
 BUFFER_SIZE = 1024
 datanodes_number = 2
 sockets = {}
@@ -19,9 +27,10 @@ conn = {}
 datanodes = []
 current_dir = "/"
 storage = "/var/storage"
+client_conn = None
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.bind((HOST, PORT))
+sock.bind((IP, PORT))
 sock.listen(5)
 print('Listening..')
 
@@ -62,9 +71,7 @@ def is_exists(filename):
 def is_exist_path(filepath):
     length = len(make_query("SELECT * From filesdb where filename='{}'". format(filepath), True))
     if length == 0:
-        print("Not found:'{}'". format(filepath))
         return False
-    print("Already Exists:'{}'". format(filepath))
     return True
 
 def get_file_ips(filepath):
@@ -75,22 +82,9 @@ def get_ips():
     count = random.sample(datanodes, 2)
     return count
 
-def send_file(path, fs_path, addr):
-    sock = sockets[addr]
-    sock.send(bytes("write {}". format(storage + fs_path), "utf-8"))
-    time.sleep(2)
-    file1 = open(path, 'rb')
-    content = file1.read(1024)
-    while (content):
-        print(content)
-        sock.send(content)
-        content = file1.read(1024)
-    time.sleep(2)
-    sock.send(b'0')
-    file1.close()
-
 def mkdir(addr, path):
     sockets[addr].send(bytes("makedir " + storage + path, "utf-8"))
+    client_conn.send("OK".encode())
 
 def mkdir_current(new_path):
     if is_exists(new_path) != True:
@@ -101,8 +95,9 @@ def mkdir_current(new_path):
         make_query("Insert into filesdb(filename, datanode1, datanode2, dir, is_dir, size) VALUES ('{0}','{1}','{2}','{3}', {4}, '-')".format(path, "_", "_", current_dir, True), False)
         for i in sockets.values():
             i.send(bytes("makedir " + storage + path, "utf-8"))
+        client_conn.send("OK".encode())
     else:
-        print("Already Exists:'{}'". format(new_path))
+        client_conn.send(("Already Exists:'{}'". format(new_path)).encode())
 
 def create_file(filename):
     if is_exists(filename) != True:
@@ -119,12 +114,13 @@ def create_file(filename):
             make_query(
                 "Insert into filesdb(filename, datanode1, datanode2, dir, is_dir, size) VALUES ('{0}','{1}','{2}','{3}', {4}, '0')"
                     .format(current_dir + filename, ips[0], ips[1], current_dir, False), False)
+        client_conn.send("OK".encode())
     else:
         if current_dir != '/':
             path = current_dir + "/" + filename
         else:
             path = current_dir + filename
-        print("Already exists:'{}'". format(path))
+        client_conn.send(("Already exists:'{}'". format(path)).encode())
 
 def read(filename):
     if is_exists(filename):
@@ -151,12 +147,13 @@ def read(filename):
                 handle.close()
             else:
                 open('/received_files/' + filename, 'w+').close()
+        client_conn.send("OK".encode())
     else:
         if current_dir != '/':
             path = current_dir + "/" + filename
         else:
             path = current_dir + filename
-        print("Not found:'{}'". format(path))
+        client_conn.send(("Not found:'{}'". format(path)).encode())
 
 def write(path, fs_path):
     ips = get_ips()
@@ -168,6 +165,21 @@ def write(path, fs_path):
                format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')],False, os.path.getsize(path)), False)
     for i in ips:
         send_file(path, fs_path, i)
+    client_conn.send("OK".encode())
+
+def send_file(path, fs_path, addr):
+    sock = sockets[addr]
+    sock.send(bytes("write {}". format(storage + fs_path), "utf-8"))
+    time.sleep(2)
+    file1 = open(path, 'rb')
+    content = file1.read(1024)
+    while (content):
+        print(content)
+        sock.send(content)
+        content = file1.read(1024)
+    time.sleep(2)
+    sock.send(b'0')
+    file1.close()
 
 def delete_dir(dirname):
     if is_exists(dirname):
@@ -191,12 +203,13 @@ def delete_dir(dirname):
                     i.send(bytes("deletedir " + path, "utf-8"))
                 make_query("DELETE FROM filesdb where dir='{}'".format(path1), False)
                 make_query("DELETE FROM filesdb where filename='{}'".format(path1), False)
+        client_conn.send("OK".encode())
     else:
         if current_dir != '/':
             path = current_dir + "/" + dirname
         else:
             path = current_dir + dirname
-        print("Not found:'{}'". format(path))
+        client_conn.send(("Not found:'{}'". format(path)).encode())
 
 def delete_file(filename):
     if is_exists(filename):
@@ -213,20 +226,23 @@ def delete_file(filename):
             make_query("DELETE FROM filesdb Where filename='{}'". format(path1), False)
             sockets[requested_file[0][1]].send(bytes("delete {}".format(path), "utf-8"))
             sockets[requested_file[0][2]].send(bytes("delete {}".format(path), "utf-8"))
+        client_conn.send("OK".encode())
     else:
         if current_dir != '/':
             path = current_dir + "/" + filename
         else:
             path = current_dir + filename
-        print("Not found:'{}'". format(path))
+        client_conn.send(("Not found:'{}'". format(path)).encode())
 
 def ls():
     requested_files = make_query("SELECT * FROM filesdb WHERE dir = '{0}';".format(current_dir), True)
+    response = ""
     for requested_file in requested_files:
         if requested_file[4]:
-            print("Directory {}".format(requested_file[0]))
+            response = response + "Directory {}".format(requested_file[0]) + "\n"
         else:
-            print("File {}".format(requested_file[0]))
+            response = response + "File {}".format(requested_file[0]) + "\n"
+    client_conn.send(response.encode())
 
 def cd(path):
     global current_dir
@@ -239,6 +255,9 @@ def cd(path):
                 current_dir = current_dir + path  
             else:
                 current_dir = current_dir + "/" + path  # /
+        client_conn.send("OK".encode())
+    else:
+        client_conn.send(("Not found:'{}'". format(path)).encode())
 
 def cp(src, dest):
     if is_exist_path(src)==True and is_exist_path(dest)==False:
@@ -248,11 +267,11 @@ def cp(src, dest):
                 .format(dest, ips[0], ips[1], dest[:dest.rfind('/')], False), False)
         sockets[ips[0]].send(bytes("copy {} {}".format(storage+src, storage+dest), "utf-8"))
         sockets[ips[1]].send(bytes("copy {} {}".format(storage+src, storage+dest), "utf-8"))
+        client_conn.send("OK".encode())
     elif is_exist_path(src)==False:
-        print("Not found:'{}'". format(src))
+        client_conn.send(("Not found:'{}'". format(src)).encode())
     else:
-        print("Already Exists:'{}'". format(dest))
-
+        client_conn.send(("Already Exists:'{}'". format(dest)).encode())
 
 def mv(src, dest):
     if is_exist_path(src):
@@ -264,6 +283,9 @@ def mv(src, dest):
         print(ips)
         sockets[ips[0]].send(bytes("move " + storage+src + " " + storage+dest, "utf-8"))
         sockets[ips[1]].send(bytes("move " + storage+src + " " + storage+dest, "utf-8"))
+        client_conn.send("OK".encode())
+    else:
+        client_conn.send(("Not found:'{}'". format(src)).encode())
 
 def make_query(query, is_return):
     conn = psycopg2.connect(dbname='postgres', user='postgres', password='postgres', host='localhost', port="5432")
@@ -333,7 +355,7 @@ def close():
 
 
 if __name__ == "__main__":
-    initialize_storage()
+    make_query("CREATE TABLE IF NOT EXISTS filesdb (filename Text, datanode1 TEXT, datanode2 TEXT, dir TEXT, is_dir BOOLEAN, size TEXT);", False)
 
     thread1 = Thread(target=handle_conn)
     thread2 = Thread(target=check_nodes_activity)
@@ -349,48 +371,52 @@ if __name__ == "__main__":
         interval = min(15, interval)
         time.sleep(interval)
 
+    client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_sock.bind((CLIENT_IP, CLIENT_PORT))
+    client_sock.listen(5)
+    print('Listening..')
+    client_conn, client_addr = client_sock.accept()
     while True:
         try:
-            print(current_dir + ">", end=" ")
-            inpt = input()
-            commands = inpt.split(" ")
-            if commands[0] == "init":
+            data = client_conn.recv(BUFFER_SIZE)
+            command = data.decode().split(" ")
+            if command[0] == "init":
                 initialize_storage()
-            elif commands[0] == "cd":
-                cd(commands[1])
-            elif commands[0] == "ls":
+            elif command[0] == "cd":
+                cd(command[1])
+            elif command[0] == "ls":
                 ls()
-            elif commands[0] == "mkdir":
-                mkdir_current(commands[1])
+            elif command[0] == "mkdir":
+                mkdir_current(command[1])
                 ls()
-            elif commands[0] == 'read':
-                read(commands[1])
-            elif commands[0] == "delete_dir":
-                delete_dir(commands[1])
+            elif command[0] == 'read':
+                read(command[1])
+            elif command[0] == "rmdir":
+                delete_dir(command[1])
                 ls()
-            elif commands[0] == "close":
+            elif command[0] == "close":
                 close()
                 sys.exit(0)
-            elif commands[0] == "delete":
-                delete_file(commands[1])
-            elif commands[0] == 'create_file':
-                create_file(commands[1])
-            elif commands[0] == 'mv':
-                mv(commands[1], commands[2])
-            elif commands[0] == 'cp':
-                cp(commands[1], commands[2])
-            elif commands[0] == 'write':
-                write(commands[1], commands[2])
+            elif command[0] == "rm":
+                delete_file(command[1])
+            elif command[0] == 'create_file':
+                create_file(command[1])
+            elif command[0] == 'mv':
+                mv(command[1], command[2])
+            elif command[0] == 'cp':
+                cp(command[1], command[2])
+            elif command[0] == 'write':
+                write(command[1], command[2])
             else:
-                print(commands[0] + ": Command not found")
+                client_conn.send((command[0] + ": Command not found").encode())
         except SystemExit:
-            print("Stop")
+            client_conn.send("Stop".encode())
             sys.exit(0)
         except KeyboardInterrupt:
-            print("Stop")
+            client_conn.send("Stop".encode())
             sys.exit(0)
         except:
-            print("Something went wrong")
+            client_conn.send("Something went wrong".encode())
             continue
 
 
