@@ -67,6 +67,7 @@ def initialize_storage():
     make_query(
         "CREATE TABLE filesdb (filename Text, datanode1 TEXT, datanode2 TEXT, dir TEXT, is_dir BOOLEAN, size TEXT);",
         False)
+    client_conn.send(bytes("OK", "utf-8"))
 
 
 def is_exists(filename):
@@ -174,14 +175,27 @@ def read(filename):
 
 
 def write(path, fs_path):
+    filename = path.split("/")[-1]
+    client_conn.send(str.encode("reading..."))
+    with open(filename, 'wb') as handle:
+        l = client_conn.recv(1024)
+        handle.write(l)
+        print("Ok")
+        while (len(l) > 1023):
+            print("Receiving...")
+            l = client_conn.recv(1024)
+            handle.write(l)
+            print(l)
+        handle.close()
+
     ips = get_ips()
     if len(fs_path[:fs_path.rfind('/')]) == 0:
         make_query(
-            "INSERT INTO filesdb(filename, datanode1, datanode, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
+            "INSERT INTO filesdb(filename, datanode1, datanode2, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
             format(fs_path, ips[0], ips[1], '/', False, os.path.getsize(path)), False)
     else:
         make_query(
-            "INSERT INTO filesdb(filename, datanode1, datanode, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
+            "INSERT INTO filesdb(filename, datanode1, datanode2, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
             format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')], False, os.path.getsize(path)), False)
     for i in ips:
         send_file(path, fs_path, i)
@@ -449,6 +463,6 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             client_conn.send("Stop".encode())
             sys.exit(0)
-        except:
-            client_conn.send("Something went wrong".encode())
-            continue
+        # except:
+        #     client_conn.send("Something went wrong".encode())
+        #     continue

@@ -30,8 +30,8 @@ class Client:
     def mkdir(self, path):
         self.__send_msg__(f'mkdir {path}')
 
-    def ls(self, path):
-        self.__send_msg__(f'ls {path}')
+    def ls(self):
+        self.__send_msg__(f'ls')
 
     def cd(self, path):
         self.__send_msg__(f'cd {path}')
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         'rm': (c.rm, 'Usage: rm /DFS_path', 2),
         'info': (c.describe_file, 'Usage: info DFS_file', 2),
         'copy': (c.cp, 'Usage: copy /DFS_path /DFS_dest_path', 3),
-        'ls': (c.ls, 'Usage: ls /DFS_path', 2),
+        'ls': (c.ls, 'Usage: ls', 1),
         'mv': (c.mv, 'Usage: mv /DFS_path /DFS_dest_path', 3),
         'rmdir': (c.rmdir, 'Usage: rmdir /DFS_path', 2),
         'mkdir': (c.mkdir, 'Usage: mkdir /DFS_path', 2),
