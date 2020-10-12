@@ -1,5 +1,6 @@
 import socket
 import os
+import argparse
 
 
 class Client:
@@ -42,18 +43,16 @@ class Client:
         data = self.__send_msg__(f"WRITE {remote_path} {os.path.getsize(local_path)}")
         if data.split(' ')[0] == 'ERROR':
             return
-        datanode, addr = self.socket.accept()
-        send_file(datanode, local_path)
-        datanode, _ = self.socket.accept()
-        result = datanode.recv(100)
+
+        send_file(self.namenode, local_path)
+        result = self.namenode.recv(1024)
         print(result)
 
     def download(self, remote_path, local_path):
         data = self.__send_msg__(f"READ {remote_path}")
         if data.split(' ')[0] == 'ERROR':
             return
-        datanode, addr = self.socket.accept()
-        recv_file(datanode, local_path)
+        recv_file(self.namenode, local_path)
 
     def rm(self, path):
         self.__send_msg__(f'REMOVE {path}')
@@ -68,24 +67,14 @@ class Client:
         self.__send_msg__(f'MOVE {old_path} {dest_path}')
 
 
-def send_file(s, filepath):
-    def stat(itr, filesize):
-        return int(itr * 1028 / filesize * 100)
+def send_file(sock, filepath):
     f = open(filepath, "rb")
-    filesize = os.path.getsize(filepath)
-    counter = 0
     l = f.read(1024)
-    prev_progr = 0
     while (l):
-        s.send(l)
-        counter += 1
-        progress = stat(counter, filesize)
-        progress = progress if progress < 100 else 100
-        if progress != prev_progr:
-            prev_progr = progress
+        sock.send(l)
         l = f.read(1024)
     f.close()
-    s.close()
+    sock.close()
 
 
 def recv_file(sock, filepath):
@@ -122,9 +111,14 @@ def option_eval(options, tokens):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("ip")
+    parser.add_argument("port")
+    args = parser.parse_args()
+
     c = Client()
-    c.connect()
-    c.init_cluster()
+    c.connect(args.ip, args.port)
+    # c.init_cluster()
 
     options = {
         'write': (c.upload, 'Usage: write /local_path /DFS_path', 3),
@@ -141,7 +135,9 @@ if __name__ == '__main__':
         'create': (c.touch, 'Usage: create /DFS_path', 2)
     }
 
+    print("> ")
     tokens = input().split(' ')
     while tokens[0] != 'exit':
+        print("> ")
         opt(options, tokens)
         tokens = input().split(' ')
