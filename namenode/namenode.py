@@ -8,6 +8,7 @@ import psycopg2
 import pathlib
 import subprocess
 import time
+import random
 
 HOST = "localhost"
 PORT = 8080
@@ -52,10 +53,24 @@ def initialize_storage():
     make_query("CREATE TABLE filesdb (filename Text, path TEXT, datanode1 TEXT, datanode2 TEXT, is_dir BOOLEAN, size TEXT);", False)
 
 def is_exists(filename):
-    pass
+    if current_dir != '/':
+        path = current_dir + "/" + filename
+    else:
+        path = current_dir + filename
+    length = len(make_query("SELECT * From filesdb where filename='{}'". format(path), True))
+    if length == 0:
+        print("Not found:'{}'". format(path))
+        return False
+    print("Already Exists:'{}'". format(path))
+    return True
 
-def get_file_path(filename):
-    pass
+def get_file_ips(filepath):
+    requested_file = make_query("SELECT * FROM filesdb WHERE filename='{}'". format(filepath), True)
+    return requested_file[0][1], requested_file[0][2]
+
+def get_ips():
+    count = random.sample(datanodes, 2)
+    return count
 
 def send_file(path, fs_path, addr):
     sock = sockets[addr]
