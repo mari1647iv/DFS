@@ -2,18 +2,21 @@ import socket
 import os
 import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("name_ip")
+parser.add_argument("name_port")
+args = parser.parse_args()
+
+name_ip = args.name_ip
+name_port = int(args.name_port)
 
 class Client:
     def __init__(self):
         self.namenode = None
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(('', 7777))
-        self.socket.listen()
 
     def connect(self, ip='127.0.0.1', port=8800):
         self.namenode = socket.socket()
-        self.namenode.connect((ip, port))
+        self.namenode.connect((ip, int(port)))
 
     def __send_msg__(self, msg, recv_label="Status"):
         self.namenode.send(str.encode(msg))
@@ -22,25 +25,25 @@ class Client:
         return data
 
     def init_cluster(self):
-        self.__send_msg__('INIT')
+        self.__send_msg__('init')
 
     def mkdir(self, path):
-        self.__send_msg__(f'MAKEDIR {path}')
+        self.__send_msg__(f'mkdir {path}')
 
     def lsdir(self, path):
-        self.__send_msg__(f'READDIR {path}')
+        self.__send_msg__(f'lsdir {path}')
 
     def cd(self, path):
-        self.__send_msg__(f'OPENDIR {path}')
+        self.__send_msg__(f'cd {path}')
 
     def rmdir(self, path):
-        self.__send_msg__(f'REMOVEDIR {path}')
+        self.__send_msg__(f'rmdir {path}')
 
     def touch(self, filepath):
-        self.__send_msg__(f'CREATE {filepath}')
+        self.__send_msg__(f'create {filepath}')
 
     def upload(self, local_path, remote_path):
-        data = self.__send_msg__(f"WRITE {remote_path} {os.path.getsize(local_path)}")
+        data = self.__send_msg__(f"write {local_path} {remote_path}")
         if data.split(' ')[0] == 'ERROR':
             return
 
@@ -49,22 +52,22 @@ class Client:
         print(result)
 
     def download(self, remote_path, local_path):
-        data = self.__send_msg__(f"READ {remote_path}")
+        data = self.__send_msg__(f"read {remote_path}")
         if data.split(' ')[0] == 'ERROR':
             return
         recv_file(self.namenode, local_path)
 
     def rm(self, path):
-        self.__send_msg__(f'REMOVE {path}')
+        self.__send_msg__(f'rm {path}')
 
     def describe_file(self, path):
-        self.__send_msg__(f'FILEINFO {path}')
+        self.__send_msg__(f'info {path}')
 
     def cp(self, old_path, dest_path):
-        self.__send_msg__(f'COPY {old_path} {dest_path}')
+        self.__send_msg__(f'cp {old_path} {dest_path}')
 
     def mv(self, old_path, dest_path):
-        self.__send_msg__(f'MOVE {old_path} {dest_path}')
+        self.__send_msg__(f'mv {old_path} {dest_path}')
 
 
 def send_file(sock, filepath):
@@ -74,7 +77,6 @@ def send_file(sock, filepath):
         sock.send(l)
         l = f.read(1024)
     f.close()
-    sock.close()
 
 
 def recv_file(sock, filepath):
@@ -85,15 +87,14 @@ def recv_file(sock, filepath):
             with open(filepath, 'wb') as f:
                 f.write(data)
         else:
-            sock.close()
             recv = False
 
 
-def opt(options, input):
-    tokens = input().split(' ')
+def opt(options):
+    tokens = input("> ").split(' ')
     while tokens[0] != 'exit':
         option_eval(options, tokens)
-        tokens = input().split(' ')
+        tokens = input("> ").split(' ')
 
 
 def option_eval(options, tokens):
@@ -108,36 +109,29 @@ def option_eval(options, tokens):
                 param[0](tokens[1])
             if param[2] == 3:
                 param[0](tokens[1], tokens[2])
+    else:
+        print(f'No command: {tokens[0]}')
+
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("ip")
-    parser.add_argument("port")
-    args = parser.parse_args()
 
     c = Client()
-    c.connect(args.ip, args.port)
-    # c.init_cluster()
+    c.connect(args.name_ip, args.name_port)
 
     options = {
         'write': (c.upload, 'Usage: write /local_path /DFS_path', 3),
-        'read': (c.download, 'Usage: read /DFS_path /local_path', 3),
-        'remove': (c.rm, 'Usage: remove /DFS_path', 2),
-        'info': (c.describe_file, 'Usage: info /DFS_path', 2),
+        'download': (c.download, 'Usage: download /DFS_path /local_path', 3),
+        'rm': (c.rm, 'Usage: rm /DFS_path', 2),
+        'info': (c.describe_file, 'Usage: info DFS_file', 2),
         'copy': (c.cp, 'Usage: copy /DFS_path /DFS_dest_path', 3),
-        'dirread': (c.lsdir, 'Usage: dirread /DFS_path', 2),
-        'move': (c.mv, 'Usage: move /DFS_path /DFS_dest_path', 3),
-        'dirremove': (c.rmdir, 'Usage: dirremove /DFS_path', 2),
-        'dirmake': (c.mkdir, 'Usage: dirmake /DFS_path', 2),
-        'diropen': (c.cd, 'Usage: diropen /DFS_path', 2),
-        'init': (c.init_cluster, 'Usage: INIT', 1),
-        'create': (c.touch, 'Usage: create /DFS_path', 2)
+        'ls': (c.lsdir, 'Usage: ls /DFS_path', 2),
+        'mv': (c.mv, 'Usage: mv /DFS_path /DFS_dest_path', 3),
+        'rmdir': (c.rmdir, 'Usage: rmdir /DFS_path', 2),
+        'mkdir': (c.mkdir, 'Usage: mkdir /DFS_path', 2),
+        'cd': (c.cd, 'Usage: cd DFS_folder', 2),
+        'init': (c.init_cluster, 'Usage: init', 1),
+        'create': (c.touch, 'Usage: create DFS_filename', 2)
     }
+    opt(options)
 
-    print("> ")
-    tokens = input().split(' ')
-    while tokens[0] != 'exit':
-        print("> ")
-        opt(options, tokens)
-        tokens = input().split(' ')
