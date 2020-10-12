@@ -13,6 +13,8 @@
         + ```sudo docker run --network='host' -t deadman445/datanode:latest 10.0.15.10 <your_datanode_host> <your_datanode_ip> <your_namenode_host>```
 ## Architectural diagram
 ![Chat](https://github.com/mari1647iv/DFS/blob/main/ArchitecturalDiagram.png)
+
+
   In this project we decided to implement Distributed File System using recursive model anology. Client sends commands to name server that passes it to storage servers, and vice versa.
 ## Communication protocols
   This DFS implementation uses TCP protocols for communication and data transfer.
