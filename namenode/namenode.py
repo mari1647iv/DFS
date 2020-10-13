@@ -172,7 +172,7 @@ def read(filename):
 
 def write(path, fs_path):
     client_conn.send(str.encode("reading..."))
-    size = client_conn.recv(1024)
+    size = int(client_conn.recv(1024).decode())
     print(size)
     
     ips = get_ips()
