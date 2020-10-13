@@ -172,20 +172,21 @@ def read(filename):
 
 def write(path, fs_path):
     client_conn.send(str.encode("reading..."))
-
+    size = client_conn.recv(1024)
+    print(size)
+    
     ips = get_ips()
     if len(fs_path[:fs_path.rfind('/')]) == 0:
         make_query(
             "INSERT INTO filesdb(filename, datanode1, datanode2, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
-            format(fs_path, ips[0], ips[1], '/', False, os.path.getsize(path)), False)
+            format(fs_path, ips[0], ips[1], '/', False, size), False)
     else:
         make_query(
             "INSERT INTO filesdb(filename, datanode1, datanode2, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
-            format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')], False, os.path.getsize(path)), False)
+            format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')], False, size), False)
     for i in ips:
         send_file(path, fs_path, i)
     client_conn.send("OK".encode())
-
 
 def send_file(path, fs_path, addr):
     sock = sockets[addr]

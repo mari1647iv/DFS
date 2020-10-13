@@ -72,6 +72,8 @@ class Client:
 
 def send_file(sock, filepath):
     f = open(filepath, "rb")
+    size = os.path.getsize(filepath)
+    sock.send(size)
     l = f.read(1024)
     while (l):
         sock.send(l)
