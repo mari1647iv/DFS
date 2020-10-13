@@ -1,6 +1,7 @@
 import socket
 import os
 import argparse
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument("name_ip")
@@ -78,6 +79,7 @@ def send_file(sock, filepath):
     while (l):
         sock.send(l)
         l = f.read(1024)
+    time.sleep(2)
     sock.send(b'0')
     f.close()
 

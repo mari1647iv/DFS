@@ -171,10 +171,18 @@ def read(filename):
 
 
 def write(path, fs_path):
+    filename = path.split("/")[-1]
     client_conn.send(str.encode("reading..."))
     size = client_conn.recv(1024)
     print(size)
-    
+    with open(filename, 'wb') as handle:
+        content = client_conn.recv(BUFFER_SIZE)
+        while (content != b'0'):
+            print(content)
+            handle.write(content)
+            content = client_conn.recv(BUFFER_SIZE)
+        handle.close()
+
     ips = get_ips()
     if len(fs_path[:fs_path.rfind('/')]) == 0:
         make_query(
@@ -185,20 +193,25 @@ def write(path, fs_path):
             "INSERT INTO filesdb(filename, datanode1, datanode2, dir,is_dir, size) VALUES ('{}','{}','{}', '{}',{}, '{}')".
             format(fs_path, ips[0], ips[1], fs_path[:fs_path.rfind('/')], False, size), False)
     for i in ips:
-        send_file(path, fs_path, i)
+        send_file(filename, fs_path, i)
     client_conn.send("OK".encode())
 
 def send_file(path, fs_path, addr):
     sock = sockets[addr]
     sock.send(bytes("write {}".format(storage + fs_path), "utf-8"))
     time.sleep(2)
-    content = client_conn.recv(BUFFER_SIZE)
-    while (content != b'0'):
-        print(content)
-        sock.send(content)
-        content = client_conn.recv(BUFFER_SIZE)
-    time.sleep(2)
-    sock.send(b'0')
+    with open(path, 'rb') as handle:
+        content = handle.read(1024)
+        if (content == b''):
+            sock.send(b'0')
+        else:
+            while (content):
+                print(content)
+                sock.send(content)
+                content = handle.read(1024)
+            time.sleep(2)
+            sock.send(b'0')
+            handle.close()
 
 
 def delete_dir(dirname):
