@@ -2,6 +2,8 @@ import socket
 import os
 import argparse
 import time
+import sys
+
 parser = argparse.ArgumentParser()
 parser.add_argument("name_ip")
 parser.add_argument("name_port")
@@ -69,6 +71,13 @@ class Client:
     def mv(self, old_path, dest_path):
         self.__send_msg__(f'mv {old_path} {dest_path}')
 
+    def exit(self):
+        self.namenode.send('close'.encode())
+        sys.exit(1)
+
+    def close(self):
+        self.namenode.close()
+        sys.exit(1)
 
 def send_file(sock, filepath):
     f = open(filepath, "rb")
@@ -116,6 +125,7 @@ def option_eval(options, tokens):
 
 
 
+
 if __name__ == '__main__':
 
     c = Client()
@@ -133,7 +143,9 @@ if __name__ == '__main__':
         'mkdir': (c.mkdir, 'Usage: mkdir /DFS_path', 2),
         'cd': (c.cd, 'Usage: cd DFS_folder', 2),
         'init': (c.init_cluster, 'Usage: init', 1),
-        'create_file': (c.create_file, 'Usage: create_file DFS_filename', 2)
+        'create_file': (c.create_file, 'Usage: create_file DFS_filename', 2),
+        'close':(c.close, "Usage: close", 1),
+        'destroy':(c.exit, "", 1)
     }
     opt(options)
 

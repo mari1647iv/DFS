@@ -425,48 +425,51 @@ if __name__ == "__main__":
     client_sock.bind((CLIENT_IP, CLIENT_PORT))
     client_sock.listen(5)
     print('Listening..')
-    client_conn, client_addr = client_sock.accept()
     while True:
-        try:
-            data = client_conn.recv(BUFFER_SIZE)
-            command = data.decode().split(" ")
-            if command[0] == "init":
-                initialize_storage()
-            elif command[0] == "cd":
-                cd(command[1])
-            elif command[0] == "ls":
-                ls()
-            elif command[0] == 'info':
-                client_conn.send(str(info(command[1])).encode())
-            elif command[0] == "mkdir":
-                mkdir_current(command[1])
-                ls()
-            elif command[0] == 'read':
-                read(command[1])
-            elif command[0] == "rmdir":
-                delete_dir(command[1])
-                ls()
-            elif command[0] == "close":
-                close()
+        client_conn, client_addr = client_sock.accept()
+        while True:
+            try:
+                data = client_conn.recv(BUFFER_SIZE)
+                command = data.decode().split(" ")
+                if command[0] == "init":
+                    initialize_storage()
+                elif command[0] == "cd":
+                    cd(command[1])
+                elif command[0] == "ls":
+                    ls()
+                elif command[0] == 'info':
+                    client_conn.send(str(info(command[1])).encode())
+                elif command[0] == "mkdir":
+                    mkdir_current(command[1])
+                    ls()
+                elif command[0] == 'read':
+                    read(command[1])
+                elif command[0] == "rmdir":
+                    delete_dir(command[1])
+                    ls()
+                elif command[0] == "close":
+                    close()
+                    sys.exit(0)
+                elif command[0] == "rm":
+                    delete_file(command[1])
+                elif command[0] == 'create_file':
+                    create_file(command[1])
+                elif command[0] == 'mv':
+                    mv(command[1], command[2])
+                elif command[0] == 'cp':
+                    cp(command[1], command[2])
+                elif command[0] == 'write':
+                    write(command[1], command[2])
+                else:
+                    client_conn.send((command[0] + ": Command not found").encode())
+            except BrokenPipeError:
+                break
+            except SystemExit:
+                client_conn.send("Stop".encode())
                 sys.exit(0)
-            elif command[0] == "rm":
-                delete_file(command[1])
-            elif command[0] == 'create_file':
-                create_file(command[1])
-            elif command[0] == 'mv':
-                mv(command[1], command[2])
-            elif command[0] == 'cp':
-                cp(command[1], command[2])
-            elif command[0] == 'write':
-                write(command[1], command[2])
-            else:
-                client_conn.send((command[0] + ": Command not found").encode())
-        except SystemExit:
-            client_conn.send("Stop".encode())
-            sys.exit(0)
-        except KeyboardInterrupt:
-            client_conn.send("Stop".encode())
-            sys.exit(0)
+            except KeyboardInterrupt:
+                client_conn.send("Stop".encode())
+                sys.exit(0)
         # except:
         #     client_conn.send("Something went wrong".encode())
         #     continue
