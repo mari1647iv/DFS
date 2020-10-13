@@ -83,7 +83,7 @@ def recv_file(sock, filepath):
     recv = True
     while recv:
         data = sock.recv(1024)
-        if data:
+        if data != b'0':
             with open(filepath, 'wb') as f:
                 f.write(data)
         else:
