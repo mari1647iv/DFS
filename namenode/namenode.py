@@ -75,7 +75,7 @@ def is_exists(filename):
         path = current_dir + "/" + filename
     else:
         path = current_dir + filename
-    is_exist_path(path)
+    return is_exist_path(path)
 
 
 def is_exist_path(filepath):
@@ -150,6 +150,7 @@ def read(filename):
             ips = get_file_ips(path)
         sock = sockets[ips[0]]
         node_conn = conn[ips[0]]
+        client_conn.send("Sending...".encode())
         sock.send(bytes("read " + storage + path, "utf-8"))
         if node_conn.recv(1024) == b'1':
             s = node_conn.recv(1024)
@@ -159,8 +160,6 @@ def read(filename):
                 print("Receiving...")
                 s = node_conn.recv(1024)
                 client_conn.send(s)
-                print(s)
-            client_conn.send(s)
             client_conn.send(b'0')
     else:
         if current_dir != '/':
@@ -178,7 +177,7 @@ def write(path, fs_path):
     with open(filename, 'wb') as handle:
         content = client_conn.recv(BUFFER_SIZE)
         while (content != b'0'):
-            print(content)
+            # print(content)
             handle.write(content)
             content = client_conn.recv(BUFFER_SIZE)
         handle.close()
@@ -206,7 +205,7 @@ def send_file(path, fs_path, addr):
             sock.send(b'0')
         else:
             while (content):
-                print(content)
+                # print(content)
                 sock.send(content)
                 content = handle.read(1024)
             time.sleep(2)

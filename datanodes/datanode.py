@@ -3,7 +3,7 @@ import shutil
 import socket
 import sys
 import argparse
-
+import time
 parser = argparse.ArgumentParser()
 parser.add_argument("ip")
 parser.add_argument("port")
@@ -36,6 +36,7 @@ def read_file(path, s1):
         s1.send(b'0')
     else:
         s1.send(b'1')
+        time.sleep(2)
         while (l):
             s1.send(l)
             l = f.read(1024)

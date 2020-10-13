@@ -85,14 +85,11 @@ def send_file(sock, filepath):
 
 
 def recv_file(sock, filepath):
-    recv = True
-    while recv:
+    with open(filepath, 'wb') as f:
         data = sock.recv(1024)
-        if data != b'0':
-            with open(filepath, 'wb') as f:
-                f.write(data)
-        else:
-            recv = False
+        while data != b'0':
+            f.write(data)
+            data = sock.recv(1024)
 
 
 def opt(options):
