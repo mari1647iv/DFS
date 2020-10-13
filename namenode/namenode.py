@@ -386,6 +386,12 @@ def backup_write(fileinf, filename, addr, backup_dir):
                 else:
                     make_query("UPDATE filesdb set datanode='{}'".format(datanode), False)
 
+def info(filename):
+    if is_exists(filename):
+        if current_dir != "/":
+            return make_query("SELECT * FROM filesdb WHERE filename = '{0}';".format(current_dir + "/" + filename), True)
+        else:
+            return make_query("SELECT * FROM filesdb WHERE filename = '{0}';".format(current_dir + filename), True)
 
 def close():
     for i in datanodes:
@@ -430,6 +436,8 @@ if __name__ == "__main__":
                 cd(command[1])
             elif command[0] == "ls":
                 ls()
+            elif command[0] == 'info':
+                client_conn.send(str(info(command[1])).encode())
             elif command[0] == "mkdir":
                 mkdir_current(command[1])
                 ls()
