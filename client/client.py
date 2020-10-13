@@ -2,7 +2,6 @@ import socket
 import os
 import argparse
 import time
-
 parser = argparse.ArgumentParser()
 parser.add_argument("name_ip")
 parser.add_argument("name_port")
@@ -74,7 +73,8 @@ class Client:
 def send_file(sock, filepath):
     f = open(filepath, "rb")
     size = os.path.getsize(filepath)
-    sock.send(size)
+    sock.send(str.encode(str(size)))
+    time.sleep(2)
     l = f.read(1024)
     while (l):
         sock.send(l)
