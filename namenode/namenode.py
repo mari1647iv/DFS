@@ -171,18 +171,7 @@ def read(filename):
 
 
 def write(path, fs_path):
-    filename = path.split("/")[-1]
     client_conn.send(str.encode("reading..."))
-    with open(filename, 'wb') as handle:
-        l = client_conn.recv(1024)
-        handle.write(l)
-        print("Ok")
-        while (len(l) > 1023):
-            print("Receiving...")
-            l = client_conn.recv(1024)
-            handle.write(l)
-            print(l)
-        handle.close()
 
     ips = get_ips()
     if len(fs_path[:fs_path.rfind('/')]) == 0:

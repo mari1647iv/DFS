@@ -76,6 +76,7 @@ def send_file(sock, filepath):
     while (l):
         sock.send(l)
         l = f.read(1024)
+    sock.send(b'0')
     f.close()
 
 
